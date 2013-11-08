@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 import Control.Arrow ((***))
-import Data.List (sortBy,findIndices,nub)
+import Data.List (sortBy,findIndices,nub,(\\))
 import Data.List.Split (chunksOf)
-import Data.Map (Map,toList,fromListWith)
+import Data.Map (Map,toList,fromListWith,unionWith,mapKeys)
 import Data.String.Utils (strip)
 import System.IO (readLn)
 
@@ -17,33 +17,31 @@ problem1 :: IO ()
 problem1 = do
   str <- readLn
   k   <- readLn
-  putStrLn . unwords . map fst . mostFrequent . kmers k $ str
 
+  let freqList = frequencyList . kmers k $ str
+  let mostFreq = takeWhile2 (\(_,x)(_,y) -> x == y) $ freqList
 
--- |Compute the most frequent elements in a list.
-mostFrequent :: Ord a => [a] -> [(a,Int)]
-mostFrequent = takeBy (\x y -> snd x == snd y) . frequencyList
-
+  putStrLn . unwords . map fst $ mostFreq
 
 -- |Take elements from a list as long as some relation holds.
-takeBy :: (a -> a -> Bool) -> [a] -> [a]
-takeBy _ [] = []
-takeBy rel (x:xs) = x : takeBy' rel x xs
+takeWhile2 :: (a -> a -> Bool) -> [a] -> [a]
+takeWhile2 _ [] = []
+takeWhile2 rel (x:xs) = x : takeWhile2' rel x xs
   where
-    takeBy' :: (a -> a -> Bool) -> a -> [a] -> [a]
-    takeBy' _ _ [] = []
-    takeBy' rel x (y:ys)
-      | x `rel` y = y : takeBy' rel y ys
+    takeWhile2' :: (a -> a -> Bool) -> a -> [a] -> [a]
+    takeWhile2' _ _ [] = []
+    takeWhile2' rel x (y:ys)
+      | x `rel` y = y : takeWhile2' rel y ys
       | otherwise = []
 
--- |Compute an ordered frequency list.
-frequencyList :: Ord a => [a] -> [(a,Int)]
-frequencyList = sortBy (\x y -> compare (snd y) (snd x)) . frequencyMap
 
+-- |Compute the ordered frequency list.
+frequencyList :: Ord a => [a] -> [(a,Int)]
+frequencyList = sortBy (\(_,x)(_,y) -> compare y x) . toList . frequencyMap
 
 -- |Compute the frequency table for the elements in a list.
-frequencyMap :: Ord a => [a] -> [(a,Int)]
-frequencyMap xs = toList . fromListWith (+) [(x, 1) | x <- xs]
+frequencyMap :: Ord a => [a] -> Map a Int
+frequencyMap xs = fromListWith (+) [(x, 1) | x <- xs]
 
 -- |Compute all k-mers in a string.
 kmers :: Int -> [a] -> [[a]]
@@ -70,11 +68,10 @@ instance HasComplement Base where
   complement 'T' = 'A'
   complement 'C' = 'G'
   complement 'G' = 'C'
+  complement  c  = error $ "invalid base " ++ [c]
 
 instance HasComplement a => HasComplement [a] where
   complement = fmap complement
-
-
 
 -- * Pattern matching problem
 
@@ -165,9 +162,49 @@ diffs (x:xs) (y:ys)
 --  Input: A string Text as well as integers k and d. (You may assume k <= 12 and d <= 3).
 --  Output: All most frequent k-mers with up to d mismatches in Text.
 problem7 :: IO ()
-problem7 = undefined
+problem7 = do
+  [str,k',d'] <- return . words =<< getLine
+  let k = read k'
+  let d = read d'
 
-approxFrequencyMap :: Int -> [a] -> [(a,Int)]
-approxFrequencyMap d = undefined
+  let freqMap  = approxFrequencyMap mutateBase d . kmers k $ str
+  let freqList = sortBy (\(_,x)(_,y) -> compare y x) . toList $ freqMap
+  let mostFreq = takeWhile2 (\(_,x)(_,y) -> x == y) $ freqList
 
-main = problem7
+  putStrLn . unwords . map fst $ mostFreq
+
+approxFrequencyMap :: Ord a => (a -> [a]) -> Int -> [[a]] -> Map [a] Int
+approxFrequencyMap f d = frequencyMap . concatMap (mutateBy f d)
+
+mutateBy :: (a -> [a]) -> Int -> [a] -> [[a]]
+mutateBy _ 0 xs = [xs]
+mutateBy _ _ [] = [[]]
+mutateBy f n (x:xs) = now ++ later
+  where
+    now   = [ x' : xs' | x' <- f x, xs' <- mutateBy f (n - 1) xs ]
+    later = [ x  : xs' | xs' <- mutateBy f n xs ]
+
+mutateBase :: Base -> [Base]
+mutateBase b = ['A','T','C','G'] \\ [b]
+
+-- * Frequent Words with Mismatches and Reverse Complements Problem
+
+-- |Find the most frequent k-mers (with mismatches and reverse complements) in a DNA string.
+--  Input: A DNA string Text as well as integers k and d.
+--  Output: All k-mers Pattern maximizing the sum Count(Text, Pattern) + Count(Text, Pattern) over all possible k-mers.
+problem8 :: IO ()
+problem8 = do
+  str <- getLine
+  [k,d] <- return . map read . words =<< getLine
+
+  let freqMap1 = approxFrequencyMap mutateBase d . kmers k $ str
+  let freqMap2 = withReverseComplement freqMap1
+  let freqList = sortBy (\(_,x)(_,y) -> compare y x) . toList $ freqMap2
+  let mostFreq = takeWhile2 (\(_,x)(_,y) -> x == y) $ freqList
+
+  putStrLn . unwords . map fst $ mostFreq
+
+withReverseComplement :: Map [Base] Int -> Map [Base] Int
+withReverseComplement m = unionWith (+) m (mapKeys (reverse . complement) m)
+
+main = problem8
