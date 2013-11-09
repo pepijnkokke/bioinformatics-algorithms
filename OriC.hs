@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 module OriC where
 
+import NucleicAcid
+
 import Control.Arrow ((***))
-import Data.List (sortBy,findIndices,nub,(\\))
+import Data.List (sortBy,findIndices,nub)
 import Data.List.Split (chunksOf)
 import Data.Map (Map,toList,fromListWith,unionWith,mapKeys)
 import Data.String.Utils (strip)
@@ -57,24 +59,7 @@ takeWhile2 rel (x:xs) = x : takeWhile2' rel x xs
 --  Input: A DNA string Pattern.
 --  Output: Pattern, the reverse complement of Pattern.
 problem2 :: IO ()
-problem2 = putStrLn . reverse . complement =<< getLine
-
-type Base = Char
-
-class HasComplement a where
-  complement :: a -> a
-  isComplement :: Eq a => a -> a -> Bool
-  isComplement x y = x == complement y
-
-instance HasComplement Base where
-  complement 'A' = 'T'
-  complement 'T' = 'A'
-  complement 'C' = 'G'
-  complement 'G' = 'C'
-  complement  c  = error $ "invalid base " ++ [c]
-
-instance HasComplement a => HasComplement [a] where
-  complement = fmap complement
+problem2 = putStrLn . reverse . complementDnaString =<< getLine
 
 
 
@@ -129,22 +114,22 @@ frequencyList = sortBy (\(_,x)(_,y) -> compare y x) . toList . frequencyMap
 --  Input: A DNA string Genome.
 --  Output: All integer(s) i minimizing Skew among all values of i (from 0 to |Genome|).
 problem5 :: IO ()
-problem5 = putStrLn . unwords . map show . reverse . skew =<< getLine
+problem5 = putStrLn . unwords . map show . reverse . minSkew =<< getLine
 
-
-skew :: [Base] -> [Int]
-skew = skewAcc 0 [] maxBound 0
+-- |Find all positions in a nucleotide string minimizing the skew.
+minSkew :: [Nucleotide] -> [Int]
+minSkew = minSkewAcc 0 [] maxBound 0
   where
-    skewAcc :: Int -> [Int] -> Int -> Int -> [Base] -> [Int]
-    skewAcc _ ix _ _ [      ] = ix
-    skewAcc i ix m s ('C':bs)
-      | s <= m = skewAcc (i + 1) [] (s - 1) (s - 1) bs
-      | s > m = skewAcc (i + 1) ix m (s - 1) bs
-    skewAcc i ix m s ('G':bs)
-      | s == m = skewAcc (i + 1) (i:ix) m (s + 1) bs
-      | s > m = skewAcc (i + 1) ix m (s + 1) bs
-    skewAcc i ix m s ( _ :bs)
-              = skewAcc (i + 1) ix m s bs
+    minSkewAcc :: Int -> [Int] -> Int -> Int -> [Nucleotide] -> [Int]
+    minSkewAcc _ ix _ _ [      ] = ix
+    minSkewAcc i ix m s ('C':bs)
+      | s <= m = minSkewAcc (i + 1) [] (s - 1) (s - 1) bs
+      | s > m = minSkewAcc (i + 1) ix m (s - 1) bs
+    minSkewAcc i ix m s ('G':bs)
+      | s == m = minSkewAcc (i + 1) (i:ix) m (s + 1) bs
+      | s > m = minSkewAcc (i + 1) ix m (s + 1) bs
+    minSkewAcc i ix m s ( _ :bs)
+              = minSkewAcc (i + 1) ix m s bs
 
 
 
@@ -183,23 +168,12 @@ problem7 = do
   let k = read k'
   let d = read d'
 
-  let mostFreq = mostFrequent . approxFrequencyMap mutateBase d . kmers k $ str
+  let mostFreq = mostFrequent . approxFrequencyMap mutateDna d . kmers k $ str
 
   putStrLn . unwords $ mostFreq
 
 approxFrequencyMap :: Ord a => (a -> [a]) -> Int -> [[a]] -> Map [a] Int
 approxFrequencyMap f d = frequencyMap . concatMap (mutateBy f d)
-
-mutateBy :: (a -> [a]) -> Int -> [a] -> [[a]]
-mutateBy _ 0 xs = [xs]
-mutateBy _ _ [] = [[]]
-mutateBy f n (x:xs) = now ++ later
-  where
-    now   = [ x' : xs' | x' <- f x, xs' <- mutateBy f (n - 1) xs ]
-    later = [ x  : xs' | xs' <- mutateBy f n xs ]
-
-mutateBase :: Base -> [Base]
-mutateBase b = ['A','T','C','G'] \\ [b]
 
 -- * Frequent Words with Mismatches and Reverse Complements Problem
 
@@ -211,12 +185,12 @@ problem8 = do
   str <- getLine
   [k,d] <- return . map read . words =<< getLine
 
-  let freqMap1 = approxFrequencyMap mutateBase d . kmers k $ str
+  let freqMap1 = approxFrequencyMap mutateDna d . kmers k $ str
   let freqMap2 = withReverseComplement freqMap1
   let freqList = sortBy (\(_,x)(_,y) -> compare y x) . toList $ freqMap2
   let mostFreq = takeWhile2 (\(_,x)(_,y) -> x == y) $ freqList
 
   putStrLn . unwords . map fst $ mostFreq
 
-withReverseComplement :: Map [Base] Int -> Map [Base] Int
-withReverseComplement m = unionWith (+) m (mapKeys (reverse . complement) m)
+withReverseComplement :: Map [Nucleotide] Int -> Map [Nucleotide] Int
+withReverseComplement m = unionWith (+) m (mapKeys (reverse . complementDnaString) m)
