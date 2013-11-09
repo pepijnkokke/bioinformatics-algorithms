@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
+module OriC where
+
 import Control.Arrow ((***))
 import Data.List (sortBy,findIndices,nub,(\\))
 import Data.List.Split (chunksOf)
@@ -18,15 +20,13 @@ problem1 = do
   str <- readLn
   k   <- readLn
 
-  putStrLn . unwords . mostFrequent . kmers k $ str
+  putStrLn . unwords . mostFrequent . frequencyMap . kmers k $ str
 
--- |Compute the most frequent k-mers in a string.
-mostFrequent :: Ord a => [a] -> [a]
-mostFrequent = map fst . takeWhile2 (\(_,x)(_,y) -> x == y) . frequencyList
-
--- |Compute the ordered frequency list.
-frequencyList :: Ord a => [a] -> [(a,Int)]
-frequencyList = sortBy (\(_,x)(_,y) -> compare y x) . toList . frequencyMap
+mostFrequent :: Ord a => Map [a] Int -> [[a]]
+mostFrequent = map fst
+               . takeWhile2 (\(_,x)(_,y) -> x == y)
+               . sortBy (\(_,x)(_,y) -> compare y x)
+               . toList
 
 -- |Compute the frequency table for the elements in a list.
 frequencyMap :: Ord a => [a] -> Map a Int
@@ -110,7 +110,16 @@ problem4 = do
 
 -- |Find patterns forming clumps in a string.
 clumps :: Ord a => Int -> Int -> Int -> [a] -> [[a]]
-clumps k l t = nub . concatMap (map fst . takeWhile (\x -> snd x >= t) . frequencyList . kmers k) . kmers l
+clumps k l t = nub
+               . concatMap (map fst
+                            . takeWhile (\x -> snd x >= t)
+                            . frequencyList
+                            . kmers k)
+               . kmers l
+
+-- |Compute the ordered frequency list.
+frequencyList :: Ord a => [a] -> [(a,Int)]
+frequencyList = sortBy (\(_,x)(_,y) -> compare y x) . toList . frequencyMap
 
 
 
@@ -174,11 +183,9 @@ problem7 = do
   let k = read k'
   let d = read d'
 
-  let freqMap  = approxFrequencyMap mutateBase d . kmers k $ str
-  let freqList = sortBy (\(_,x)(_,y) -> compare y x) . toList $ freqMap
-  let mostFreq = takeWhile2 (\(_,x)(_,y) -> x == y) $ freqList
+  let mostFreq = mostFrequent . approxFrequencyMap mutateBase d . kmers k $ str
 
-  putStrLn . unwords . map fst $ mostFreq
+  putStrLn . unwords $ mostFreq
 
 approxFrequencyMap :: Ord a => (a -> [a]) -> Int -> [[a]] -> Map [a] Int
 approxFrequencyMap f d = frequencyMap . concatMap (mutateBy f d)
@@ -213,5 +220,3 @@ problem8 = do
 
 withReverseComplement :: Map [Base] Int -> Map [Base] Int
 withReverseComplement m = unionWith (+) m (mapKeys (reverse . complement) m)
-
-main = problem8
