@@ -1,6 +1,5 @@
 {-# LANGUAGE TupleSections #-}
 
-
 import NucleicAcid
 
 import Control.Arrow
@@ -14,6 +13,7 @@ import Data.Tuple (swap)
 import System.IO (getLine,readLn)
 
 
+
 -- * Protein Translation Problem
 
 -- |Translate an RNA string into an amino acid string.
@@ -24,19 +24,23 @@ import System.IO (getLine,readLn)
 --  * For your convenience, we provide a downloadable RNA codon table indicating
 --    which codons encode which amino acids.
 problem1 :: IO ()
-problem1 = putStrLn . encoding =<< getLine
+problem1 = putStrLn . decodeRna =<< getLine
 
 -- |Convert an RNA string to the corresponding peptide.
-encoding :: RNA -> Peptide
-encoding = mapMaybe codon2amino . chunksOf 3
+decodeRna :: RNA -> Peptide
+decodeRna = mapMaybe decodeCodon . chunksOf 3
 
 -- |Convert a codon to the corresponding amino acid.
-codon2amino :: Codon -> Maybe AminoAcid
-codon2amino = flip M.lookup tbl
-  where tbl = M.fromList dat
+decodeCodon :: Codon -> Maybe AminoAcid
+decodeCodon = flip M.lookup codonToAminoAcid
 
-dat :: [(Codon,AminoAcid)]
-dat =
+-- |Table mapping codons to their respective amino acid.
+codonToAminoAcid :: Map Codon AminoAcid
+codonToAminoAcid = M.fromList encodingPairs
+
+-- |List of codons paired with their respective amino acids.
+encodingPairs :: [(Codon,AminoAcid)]
+encodingPairs =
   [("AAA",'K'),("AAC",'N'),("AAG",'K'),("AAU",'N'),("ACA",'T'),("ACC",'T'),("ACG",'T')
   ,("ACU",'T'),("AGA",'R'),("AGC",'S'),("AGG",'R'),("AGU",'S'),("AUA",'I'),("AUC",'I')
   ,("AUG",'M'),("AUU",'I'),("CAA",'Q'),("CAC",'H'),("CAG",'Q'),("CAU",'H'),("CCA",'P')
@@ -60,35 +64,25 @@ problem2 = do
   pep <- getLine
 
   putStrLn . unlines
-    . map rna2dna
-    . decodings $ pep
+    . filter (`isInfixOf` dna)
+    . withReverseComplements
+    . map transcribeRnaString
+    . encodePeptide $ pep
 
--- |Convert a DNA string to an RNA string.
-dna2rna :: DNA -> RNA
-dna2rna = map conv
-  where conv 'T' = 'U'
-        conv  n  =  n
+-- |Convert a peptide to the corresponding RNA strings.
+encodePeptide :: Peptide -> [RNA]
+encodePeptide = map concat . foldr (\a rs -> [ c : cs | c <- encodeAminoAcid a, cs <- rs ]) [[]]
 
--- |Convert a RNA string to an DNA string.
-rna2dna :: RNA -> DNA
-rna2dna = map conv
-  where conv 'U' = 'T'
-        conv  n  =  n
+-- |Convert an amino acid to the corresponding codons.
+encodeAminoAcid :: AminoAcid -> [Codon]
+encodeAminoAcid a = M.findWithDefault [] a aminoAcidToCodons
 
-decodings :: Peptide -> [RNA]
-decodings = map concat . foldr (\a rs -> [ c : cs | c <- amino2codons a, cs <- rs ]) [[]]
+-- |Table mapping amino acids to their respective codons.
+aminoAcidToCodons :: Map AminoAcid [Codon]
+aminoAcidToCodons = M.fromListWith (++) [ (a,[c]) | (c,a) <- encodingPairs ]
 
-amino2codons :: AminoAcid -> [Codon]
-amino2codons a = M.findWithDefault [] a tbl
-  where
-    tbl = M.fromListWith (++) [ (a,[c]) | (c,a) <- dat ]
-
-{-
-pep2rna :: Map AminoAcid [Codon] -> Peptide -> [RNA]
-pep2rna tbl = map concat . foldr (\a rs -> [ c : cs | c <- lookup a, cs <- rs ]) [[]]
-  where
-    lookup :: AminoAcid -> [Codon]
-    lookup x = M.findWithDefault [""] x tbl
--}
+-- |Add reverse complements to a list of DNA strings.
+withReverseComplements :: [DNA] -> [DNA]
+withReverseComplements gs = gs ++ map (reverse . complementDnaString) gs
 
 main = problem2

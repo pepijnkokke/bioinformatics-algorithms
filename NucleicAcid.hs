@@ -10,6 +10,24 @@ type Codon      = [Nucleotide]
 type AminoAcid  = Char
 type Peptide    = [AminoAcid]
 
+-- * Transcribing between DNA and RNA
+
+transcribeDna :: Nucleotide -> Nucleotide
+transcribeDna 'T' = 'U'
+transcribeDna  n  =  n
+
+transcribeDnaString :: DNA -> RNA
+transcribeDnaString = map transcribeDna
+
+transcribeRna :: Nucleotide -> Nucleotide
+transcribeRna 'U' = 'T'
+transcribeRna  n  =  n
+
+transcribeRnaString :: DNA -> RNA
+transcribeRnaString = map transcribeRna
+
+
+
 -- * Mutations of nucleotides
 
 mutateBy :: (a -> [a]) -> Int -> [a] -> [[a]]
@@ -25,6 +43,9 @@ mutateDna n = ['A','T','C','G'] \\ [n]
 
 mutateRna :: Nucleotide -> [Nucleotide]
 mutateRna n = ['A','U','C','G'] \\ [n]
+
+
+
 
 -- * Complements of nucleic acids
 
