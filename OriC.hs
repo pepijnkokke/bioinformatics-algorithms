@@ -18,22 +18,11 @@ problem1 = do
   str <- readLn
   k   <- readLn
 
-  let freqList = frequencyList . kmers k $ str
-  let mostFreq = takeWhile2 (\(_,x)(_,y) -> x == y) $ freqList
+  putStrLn . unwords . mostFrequent . kmers k $ str
 
-  putStrLn . unwords . map fst $ mostFreq
-
--- |Take elements from a list as long as some relation holds.
-takeWhile2 :: (a -> a -> Bool) -> [a] -> [a]
-takeWhile2 _ [] = []
-takeWhile2 rel (x:xs) = x : takeWhile2' rel x xs
-  where
-    takeWhile2' :: (a -> a -> Bool) -> a -> [a] -> [a]
-    takeWhile2' _ _ [] = []
-    takeWhile2' rel x (y:ys)
-      | x `rel` y = y : takeWhile2' rel y ys
-      | otherwise = []
-
+-- |Compute the most frequent k-mers in a string.
+mostFrequent :: Ord a => [a] -> [a]
+mostFrequent = map fst . takeWhile2 (\(_,x)(_,y) -> x == y) . frequencyList
 
 -- |Compute the ordered frequency list.
 frequencyList :: Ord a => [a] -> [(a,Int)]
@@ -49,12 +38,26 @@ kmers k xs
   | length xs >= k = take k xs : kmers k (tail xs)
   | otherwise     = []
 
+-- |Take elements from a list as long as some relation holds.
+takeWhile2 :: (a -> a -> Bool) -> [a] -> [a]
+takeWhile2 _ [] = []
+takeWhile2 rel (x:xs) = x : takeWhile2' rel x xs
+  where
+    takeWhile2' :: (a -> a -> Bool) -> a -> [a] -> [a]
+    takeWhile2' _ _ [] = []
+    takeWhile2' rel x (y:ys)
+      | x `rel` y = y : takeWhile2' rel y ys
+      | otherwise = []
+
 
 
 -- * Reverse complement problem
+
+-- |Reverse complement a nucleotide pattern.
+--  Input: A DNA string Pattern.
+--  Output: Pattern, the reverse complement of Pattern.
 problem2 :: IO ()
 problem2 = putStrLn . reverse . complement =<< getLine
-
 
 type Base = Char
 
@@ -73,8 +76,13 @@ instance HasComplement Base where
 instance HasComplement a => HasComplement [a] where
   complement = fmap complement
 
+
+
 -- * Pattern matching problem
 
+-- |Find all occurrences of a pattern in a string.
+--  Input: Two strings: a pattern and a genome string.
+--  Output: All starting positions where pattern appears as a substring of genome.
 problem3 :: IO ()
 problem3 = do
   patn <- getLine
@@ -91,16 +99,16 @@ matchesBy rel patn str = findIndices (rel patn) (kmers (length patn) str)
 
 -- * Clump finding problem
 
--- |find patterns forming clumps in a string.
---  input: a string genome, and integers k, l, and t.
---  output: all distinct k-mers forming (l, t)-clumps in genome.
+-- |Find patterns forming clumps in a string.
+--  Input: a string genome, and integers k, l, and t.
+--  Output: all distinct k-mers forming (l, t)-clumps in genome.
 problem4 :: IO ()
 problem4 = do
   str     <- readLn
   [k,l,t] <- return . map read . words =<< readLn
   putStrLn . unwords . clumps k l t $ str
 
-
+-- |Find patterns forming clumps in a string.
 clumps :: Ord a => Int -> Int -> Int -> [a] -> [[a]]
 clumps k l t = nub . concatMap (map fst . takeWhile (\x -> snd x >= t) . frequencyList . kmers k) . kmers l
 
@@ -128,7 +136,6 @@ skew = skewAcc 0 [] maxBound 0
       | s > m = skewAcc (i + 1) ix m (s + 1) bs
     skewAcc i ix m s ( _ :bs)
               = skewAcc (i + 1) ix m s bs
-
 
 
 
